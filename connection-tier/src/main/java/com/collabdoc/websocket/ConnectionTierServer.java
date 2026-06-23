@@ -3,6 +3,7 @@ package com.collabdoc.websocket;
 import com.collabdoc.document.CommittedOperation;
 import com.collabdoc.document.DocumentSequencer;
 import com.collabdoc.ot.Operation;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -18,6 +19,10 @@ import java.util.List;
  *
  * CP 2.5: on connect, send the new client the full op log so it can
  * reconstruct current state by replaying it (no snapshots).
+ *
+ * CP 3.6: also accepts a "resync" control message (not an Operation) that
+ * just re-sends history -- a client-side correctness safety net, not a new
+ * conflict-resolution mechanism.
  *
  * Each connection is scoped to exactly one document, taken from the request
  * path (e.g. ws://host:port/doc-1 -> documentId "doc-1") at connect time --
@@ -61,8 +66,21 @@ public class ConnectionTierServer extends WebSocketServer {
     public void onMessage(WebSocket conn, String message) {
         try {
             String documentId = sessions.documentIdFor(conn);
-            Operation operation = objectMapper.readValue(message, Operation.class);
+            JsonNode root = objectMapper.readTree(message);
 
+            if ("resync".equals(root.path("type").asText())) {
+                // A client-side correctness safety net (see ot-client.js): when a
+                // client's local optimistic reconciliation might have drifted (the
+                // multi-pending-op TP2-style edge case), it asks for history again
+                // rather than trusting its own incremental state indefinitely. This
+                // is a plain read, not tied to peer registration -- the connection is
+                // already registered from onOpen.
+                sequencer.history(documentId)
+                        .thenAccept(history -> send(conn, ServerMessage.history(documentId, history)));
+                return;
+            }
+
+            Operation operation = objectMapper.treeToValue(root, Operation.class);
             sequencer.submit(documentId, operation)
                     .thenAccept(committed -> deliver(conn, documentId, committed));
         } catch (Exception ex) {

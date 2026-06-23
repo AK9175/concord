@@ -8,3 +8,4 @@ target/
 
 # IDE/extension-generated tooling artifacts, not project source
 .github/modernize/
+.claude/

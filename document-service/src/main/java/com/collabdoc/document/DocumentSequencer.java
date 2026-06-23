@@ -60,6 +60,18 @@ public class DocumentSequencer {
         return committer.currentText(documentId);
     }
 
+    /**
+     * Read-only history fetch for an already-connected client asking to
+     * resync (e.g. a client-side correctness safety net -- see
+     * ConnectionTierServer's "resync" message handling). Unlike connect(),
+     * this doesn't touch peer registration; it still runs on the document's
+     * own executor so it reflects a consistent point relative to any commit
+     * in progress, not a stale or torn read.
+     */
+    public CompletableFuture<List<CommittedOperation>> history(String documentId) {
+        return runOnDocumentExecutor(documentId, () -> committer.history(documentId));
+    }
+
     private <T> CompletableFuture<T> runOnDocumentExecutor(String documentId, Supplier<T> task) {
         ExecutorService executor = executorsByDocument.computeIfAbsent(
                 documentId, id -> Executors.newSingleThreadExecutor());
