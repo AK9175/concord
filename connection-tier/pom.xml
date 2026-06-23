@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.collabdoc</groupId>
+    <artifactId>collab-document-editor-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>connection-tier</artifactId>
+  <packaging>jar</packaging>
+
+  <!--
+    Independently deployable: terminates client WebSockets, owns sticky
+    connection state, fans out updates, forwards inbound edits to
+    document-service.
+
+    TRADEOFF: through Phase 2-5, this depends directly on document-service
+    as an in-process Java call (see ConnectionTierServer). There is no
+    network hop yet, so this dependency is a normal compile-time Maven
+    dependency like any other. Phase 6 replaces this direct call with the
+    "internal API (RPC or message bus)" the brief specifies, at which point
+    this module dependency goes away entirely in favor of a wire protocol.
+  -->
+
+  <dependencies>
+    <dependency>
+      <groupId>com.collabdoc</groupId>
+      <artifactId>ot-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.collabdoc</groupId>
+      <artifactId>document-service</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.java-websocket</groupId>
+      <artifactId>Java-WebSocket</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
