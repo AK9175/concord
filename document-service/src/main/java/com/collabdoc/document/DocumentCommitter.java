@@ -51,7 +51,7 @@ class DocumentCommitter {
                 .sorted(Comparator.comparingInt(Operation::position).reversed())
                 .toList();
 
-        String currentText = textByDocument.getOrDefault(documentId, "");
+        String currentText = currentText(documentId);
         String updatedText = OperationApplier.applyAll(currentText, inApplyOrder);
         textByDocument.put(documentId, updatedText);
 
@@ -66,8 +66,32 @@ class DocumentCommitter {
         return committed;
     }
 
+    /**
+     * CP 5.3: the in-memory cache starts empty on every server restart, but
+     * Postgres may already hold a long history for documentId from before
+     * that restart. Defaulting to "" for any uncached document (the
+     * pre-CP-5.3 behavior) would silently apply the FIRST edit after a
+     * restart to an empty string instead of the document's real prior
+     * content -- the log itself stays correct (append() doesn't care about
+     * this cache), but the server's working copy, and everything built on
+     * top of it from that point on, would be wrong. computeIfAbsent's
+     * per-key atomicity (guaranteed by ConcurrentHashMap) makes this safe to
+     * call from commit() (always on this document's single-threaded
+     * executor) and from direct external callers (e.g. tests) concurrently:
+     * the rebuild is a pure, idempotent function of the log, so even a
+     * hypothetical double-computation would just redo the same work twice,
+     * never produce a wrong or inconsistent result.
+     */
     String currentText(String documentId) {
-        return textByDocument.getOrDefault(documentId, "");
+        return textByDocument.computeIfAbsent(documentId, this::rebuildFromLog);
+    }
+
+    private String rebuildFromLog(String documentId) {
+        String text = "";
+        for (CommittedOperation committed : operationLog.readFrom(documentId, 0)) {
+            text = OperationApplier.apply(text, committed.operation());
+        }
+        return text;
     }
 
     /** Every committed operation for documentId, in revision order, from the start. */

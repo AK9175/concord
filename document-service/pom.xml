@@ -16,13 +16,31 @@
   <!--
     Independently deployable: per-document sequencer, revision counter,
     OperationLog, in-memory active document state, transform/apply via
-    ot-core. Empty until Phase 2 (CP 2.2).
+    ot-core. CP 5.1 adds a Postgres-backed OperationLog (HikariCP for
+    pooling; a hand-rolled pool is its own source of subtle bugs, not
+    worth avoiding a small, standard dependency for) behind the same
+    interface the in-memory implementation already satisfies.
   -->
 
   <dependencies>
     <dependency>
       <groupId>com.collabdoc</groupId>
       <artifactId>ot-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.zaxxer</groupId>
+      <artifactId>HikariCP</artifactId>
     </dependency>
 
     <dependency>
