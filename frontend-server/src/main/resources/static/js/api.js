@@ -45,3 +45,11 @@ export function addUser(documentId, username, color) {
     body: JSON.stringify({ username, color }),
   }).then(asJson);
 }
+
+export function renameUser(documentId, userId, username, color) {
+  return fetch(`${API_BASE}/docs/${documentId}/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, color }),
+  }).then(asJson);
+}

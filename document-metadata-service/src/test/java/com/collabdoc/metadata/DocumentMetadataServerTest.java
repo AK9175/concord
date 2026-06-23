@@ -118,6 +118,42 @@ class DocumentMetadataServerTest {
     }
 
     @Test
+    void renamingAUserKeepsTheirUserIdAndIsVisibleOnTheNextFetch() throws Exception {
+        String documentId = MAPPER.readTree(request("POST", "/docs", "{\"title\":\"Shared Doc\"}").body())
+                .get("id").asText();
+        JsonNode added = MAPPER.readTree(
+                request("POST", "/docs/" + documentId + "/users", "{\"username\":\"alice\",\"color\":\"#ff0000\"}")
+                        .body());
+        String userId = added.get("userId").asText();
+
+        HttpResponse<String> renameResponse = request("PATCH", "/docs/" + documentId + "/users/" + userId,
+                "{\"username\":\"alicia\",\"color\":\"#00ff00\"}");
+        assertEquals(200, renameResponse.statusCode());
+        JsonNode renamed = MAPPER.readTree(renameResponse.body());
+        assertEquals(userId, renamed.get("userId").asText());
+        assertEquals("alicia", renamed.get("username").asText());
+        assertEquals("#00ff00", renamed.get("color").asText());
+
+        // "Propagates to connected clients" for this REST-only checkpoint means:
+        // anyone re-fetching the roster (e.g. on reconnect) sees the new name --
+        // simulating a fresh client/tab asking for the roster again.
+        JsonNode usersAfterRename = MAPPER.readTree(request("GET", "/docs/" + documentId + "/users", null).body());
+        assertEquals(1, usersAfterRename.size());
+        assertEquals(userId, usersAfterRename.get(0).get("userId").asText());
+        assertEquals("alicia", usersAfterRename.get(0).get("username").asText());
+    }
+
+    @Test
+    void renamingAnUnknownUserReturns404() throws Exception {
+        String documentId = MAPPER.readTree(request("POST", "/docs", "{\"title\":\"Shared Doc\"}").body())
+                .get("id").asText();
+
+        HttpResponse<String> response = request("PATCH", "/docs/" + documentId + "/users/does-not-exist",
+                "{\"username\":\"x\",\"color\":\"#000000\"}");
+        assertEquals(404, response.statusCode());
+    }
+
+    @Test
     void responsesIncludeCorsHeadersForTheFrontendsOrigin() throws Exception {
         HttpResponse<String> response = request("GET", "/docs", null);
         assertEquals("*", response.headers().firstValue("Access-Control-Allow-Origin").orElse(null));

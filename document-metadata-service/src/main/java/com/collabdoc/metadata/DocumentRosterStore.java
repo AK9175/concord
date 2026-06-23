@@ -1,6 +1,7 @@
 package com.collabdoc.metadata;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Each document's own userId -> {username, color} roster. Per-document, not
@@ -14,4 +15,12 @@ public interface DocumentRosterStore {
     User addUser(String documentId, String username, String color);
 
     List<User> listUsers(String documentId);
+
+    /**
+     * Updates an existing identity's display name/color without disturbing
+     * its userId -- ops/cursors already attributed to that userId stay
+     * attributed to the same identity, just with a new name going forward.
+     * Returns empty if userId isn't in documentId's roster.
+     */
+    Optional<User> renameUser(String documentId, String userId, String username, String color);
 }

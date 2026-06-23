@@ -60,7 +60,7 @@ class FrontendServerTest {
         HttpResponse<String> response = get("/some-arbitrary-doc-id");
 
         assertEquals(200, response.statusCode());
-        assertTrue(response.body().contains("Concord editor"));
+        assertTrue(response.body().contains("doc-textarea"));
     }
 
     @Test
@@ -70,6 +70,6 @@ class FrontendServerTest {
         HttpResponse<String> response = get("/../../pom.xml");
 
         assertEquals(200, response.statusCode());
-        assertTrue(response.body().contains("Concord editor"));
+        assertTrue(response.body().contains("doc-textarea"));
     }
 }

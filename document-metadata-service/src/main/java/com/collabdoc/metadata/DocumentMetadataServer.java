@@ -13,7 +13,8 @@ import java.util.Optional;
 
 /**
  * REST endpoints for document metadata + per-document roster:
- * POST/GET /docs, GET/PATCH /docs/{id}, GET/POST /docs/{id}/users.
+ * POST/GET /docs, GET/PATCH /docs/{id}, GET/POST /docs/{id}/users,
+ * PATCH /docs/{id}/users/{userId}.
  *
  * Hand-rolled routing over the JDK's built-in HttpServer (same approach as
  * frontend-server) rather than a web framework -- the route table is six
@@ -70,6 +71,8 @@ public class DocumentMetadataServer {
                 handleSingleDocument(exchange, method, segments[1]);
             } else if (segments.length == 3 && segments[2].equals("users")) {
                 handleRoster(exchange, method, segments[1]);
+            } else if (segments.length == 4 && segments[2].equals("users")) {
+                handleSingleUser(exchange, method, segments[1], segments[3]);
             } else {
                 sendJson(exchange, 404, errorBody("not found"));
             }
@@ -125,6 +128,21 @@ public class DocumentMetadataServer {
         }
     }
 
+    private void handleSingleUser(HttpExchange exchange, String method, String documentId, String userId)
+            throws IOException {
+        if (method.equals("PATCH")) {
+            RenameUserRequest request = readBody(exchange, RenameUserRequest.class);
+            Optional<User> renamed = rosterStore.renameUser(documentId, userId, request.username(), request.color());
+            if (renamed.isPresent()) {
+                sendJson(exchange, 200, renamed.get());
+            } else {
+                sendJson(exchange, 404, errorBody("user not found"));
+            }
+        } else {
+            sendJson(exchange, 405, errorBody("method not allowed"));
+        }
+    }
+
     private <T> T readBody(HttpExchange exchange, Class<T> type) throws IOException {
         return objectMapper.readValue(exchange.getRequestBody(), type);
     }
@@ -163,5 +181,8 @@ public class DocumentMetadataServer {
     }
 
     private record AddUserRequest(String username, String color) {
+    }
+
+    private record RenameUserRequest(String username, String color) {
     }
 }

@@ -13,7 +13,27 @@
     <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-4">
       <a href="/" class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-semibold">C</a>
       <span class="text-sm font-medium text-slate-400">Editing as</span>
-      <span id="current-user-label" class="text-sm font-semibold text-slate-800"></span>
+      <button
+        id="current-user-label"
+        type="button"
+        title="Click to rename yourself"
+        class="rounded px-1 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+      ></button>
+
+      <form id="rename-self-form" class="hidden items-center gap-2">
+        <input
+          id="rename-self-input"
+          type="text"
+          class="rounded-lg border border-slate-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        />
+        <input id="rename-self-color" type="color" class="h-7 w-7 cursor-pointer rounded border border-slate-300" />
+        <button type="submit" class="rounded-lg bg-indigo-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-indigo-700">Save</button>
+        <button type="button" id="rename-self-cancel" class="text-sm text-slate-500 hover:underline">Cancel</button>
+      </form>
+
+      <!-- Ephemeral presence (CP 4.3): who else currently has this document open. Never
+           persisted -- rebuilt from scratch from "presence-snapshot" on every connect. -->
+      <div id="presence-list" class="ml-auto flex items-center gap-1.5"></div>
     </div>
   </header>
 
@@ -53,12 +73,32 @@
 
   <main id="editor-area" class="mx-auto hidden max-w-3xl px-6 py-10">
     <h1 id="doc-title" class="text-2xl font-semibold text-slate-800"></h1>
-    <textarea
-      id="doc-textarea"
-      class="mt-4 h-[70vh] w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-      placeholder="Start typing..."
-    ></textarea>
-    <!-- CP 3.5 wires this textarea's input events into ops; CP 3.6 adds live two-tab convergence. -->
+
+    <!--
+      CP 4.4: a plain <textarea> can't render foreground decorations (other
+      people's carets) inside its own native text layout, so remote carets are
+      drawn by a separate overlay positioned exactly on top of it. cursor-mirror
+      is an invisible (visibility:hidden, still participates in layout) copy of
+      the SAME text with the same font/padding/border, used only to MEASURE
+      where a given character offset lands in pixels (via a temporary marker
+      span's getBoundingClientRect()); cursor-overlay is the visible,
+      pointer-events:none layer that actually draws the colored caret + name
+      tag at that measured position. All three children fill the wrapper via
+      inset-0, which is why the wrapper (not the children) carries the height.
+    -->
+    <div class="relative mt-4 h-[70vh]">
+      <div
+        id="cursor-mirror"
+        aria-hidden="true"
+        class="invisible absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl border border-transparent p-4 text-sm leading-relaxed"
+      ></div>
+      <textarea
+        id="doc-textarea"
+        class="absolute inset-0 resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        placeholder="Start typing..."
+      ></textarea>
+      <div id="cursor-overlay" class="pointer-events-none absolute inset-0 overflow-hidden"></div>
+    </div>
   </main>
 
   <script type="module" src="/js/editor.js"></script>
