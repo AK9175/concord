@@ -15,13 +15,20 @@
 
   <!--
     Independently deployable: document id/title CRUD, per-document user
-    roster, REST endpoints. Empty until Phase 3 (CP 3.1).
+    roster, REST endpoints. Uses only the JDK's built-in
+    com.sun.net.httpserver.HttpServer (same approach as frontend-server) plus
+    Jackson for JSON request/response bodies;no ot-core dependency, since
+    this module never touches an Operation.
+
+    TRADEOFF: frontend-server runs on its own origin, so REST calls from the
+    browser are cross-origin;this service sends CORS headers on every
+    response rather than relying on same-origin requests.
   -->
 
   <dependencies>
     <dependency>
-      <groupId>com.collabdoc</groupId>
-      <artifactId>ot-core</artifactId>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
 
     <dependency>

@@ -20,6 +20,7 @@
     <module>document-metadata-service</module>
     <module>connection-tier</module>
     <module>document-service</module>
+    <module>frontend-server</module>
   </modules>
 
   <properties>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concord — Editor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/base.css" />
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-3xl items-center gap-3 px-6 py-4">
+      <a href="/" class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-semibold">C</a>
+      <span class="text-sm font-medium text-slate-400">Editing as</span>
+      <span id="current-user-label" class="text-sm font-semibold text-slate-800"></span>
+    </div>
+  </header>
+
+  <!-- Identity picker: shown on every load, nothing pre-selected, never persisted. -->
+  <div id="picker-overlay" class="fixed inset-0 z-10 flex items-center justify-center bg-slate-900/40 px-6">
+    <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+      <h2 class="text-base font-semibold">Who's editing?</h2>
+      <p class="mt-1 text-sm text-slate-500">Pick an existing collaborator or join as someone new.</p>
+
+      <div id="picker-user-list" class="mt-4 space-y-1">
+        <!-- populated by identity-picker.js -->
+      </div>
+
+      <hr class="my-4 border-slate-200" />
+
+      <form id="picker-add-form" class="space-y-3">
+        <div class="flex items-center gap-2">
+          <input
+            id="picker-username-input"
+            type="text"
+            placeholder="Your name"
+            class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+          />
+          <input id="picker-color-input" type="color" class="h-9 w-9 cursor-pointer rounded-lg border border-slate-300" />
+        </div>
+        <button
+          type="submit"
+          class="w-full rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Join as new collaborator
+        </button>
+      </form>
+
+      <p id="picker-error" class="mt-3 hidden text-sm text-red-600"></p>
+    </div>
+  </div>
+
+  <main id="editor-area" class="mx-auto hidden max-w-3xl px-6 py-10">
+    <h1 id="doc-title" class="text-2xl font-semibold text-slate-800"></h1>
+    <textarea
+      id="doc-textarea"
+      class="mt-4 h-[70vh] w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+      placeholder="Start typing..."
+    ></textarea>
+    <!-- CP 3.5 wires this textarea's input events into ops; CP 3.6 adds live two-tab convergence. -->
+  </main>
+
+  <script type="module" src="/js/editor.js"></script>
+</body>
+</html>

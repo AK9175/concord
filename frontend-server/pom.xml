@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.collabdoc</groupId>
+    <artifactId>collab-document-editor-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>frontend-server</artifactId>
+  <packaging>jar</packaging>
+
+  <!--
+    Independently deployable: serves its own bundled static files
+    (src/main/resources/static;HTML/CSS/JS) on its own port, separate from
+    document-metadata-service's REST API and connection-tier's WebSocket.
+    Uses only the JDK's built-in com.sun.net.httpserver.HttpServer;no new
+    dependency needed for plain static file serving.
+
+    TRADEOFF: running the frontend on its own origin means browser fetch()
+    calls to document-metadata-service's REST API are cross-origin, so that
+    service must send CORS headers. Accepted in exchange for every component
+    being independently deployable, per the target architecture.
+  -->
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
