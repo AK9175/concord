@@ -10,6 +10,74 @@ services:
       - "5432:5432"
     volumes:
       - concord-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # plain depends_on only waits for the container to START, not for
+      # Postgres to actually be ready to accept connections -- HikariCP fails
+      # fast (no retry) on construction, so document-service/document-
+      # metadata-service would crash-loop on a cold `docker compose up`
+      # without this. condition: service_healthy below waits for this instead.
+      test: ["CMD-SHELL", "pg_isready -U concord -d concord"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  document-service:
+    build:
+      context: .
+      dockerfile: document-service/Dockerfile
+    container_name: concord-document-service
+    environment:
+      # "postgres" resolves via Docker's internal DNS to the postgres service
+      # above -- "localhost" (Main.java's default) would mean this container
+      # itself, not the database, once both run as separate containers.
+      CONCORD_DB_URL: jdbc:postgresql://postgres:5432/concord
+      CONCORD_DB_USER: concord
+      CONCORD_DB_PASSWORD: concord
+    ports:
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  document-metadata-service:
+    build:
+      context: .
+      dockerfile: document-metadata-service/Dockerfile
+    container_name: concord-document-metadata-service
+    environment:
+      CONCORD_DB_URL: jdbc:postgresql://postgres:5432/concord
+      CONCORD_DB_USER: concord
+      CONCORD_DB_PASSWORD: concord
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  connection-tier:
+    build:
+      context: .
+      dockerfile: connection-tier/Dockerfile
+    container_name: concord-connection-tier
+    environment:
+      # Phase 6: connection-tier no longer talks to Postgres directly at all
+      # -- it talks to document-service over gRPC, and document-service owns
+      # the database connection. "document-service" resolves via Docker's
+      # internal DNS to the service below.
+      DOCUMENT_SERVICE_HOST: document-service
+      DOCUMENT_SERVICE_PORT: "9090"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - document-service
+
+  frontend-server:
+    build:
+      context: .
+      dockerfile: frontend-server/Dockerfile
+    container_name: concord-frontend-server
+    ports:
+      - "8082:8082"
 
 volumes:
   concord-postgres-data:

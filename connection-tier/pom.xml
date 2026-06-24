@@ -18,12 +18,10 @@
     connection state, fans out updates, forwards inbound edits to
     document-service.
 
-    TRADEOFF: through Phase 2-5, this depends directly on document-service
-    as an in-process Java call (see ConnectionTierServer). There is no
-    network hop yet, so this dependency is a normal compile-time Maven
-    dependency like any other. Phase 6 replaces this direct call with the
-    "internal API (RPC or message bus)" the brief specifies, at which point
-    this module dependency goes away entirely in favor of a wire protocol.
+    Phase 6: document-service is now a genuinely separate process, talked to
+    over gRPC (see DocumentServiceClient). This module depends only on
+    document-service-proto (the wire contract: generated message/stub
+    classes, no business logic), never on document-service itself.
   -->
 
   <dependencies>
@@ -34,7 +32,12 @@
 
     <dependency>
       <groupId>com.collabdoc</groupId>
-      <artifactId>document-service</artifactId>
+      <artifactId>document-service-proto</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-netty-shaded</artifactId>
     </dependency>
 
     <dependency>
@@ -43,9 +46,59 @@
     </dependency>
 
     <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-inprocess</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!--
+      Test-only: tests need a REAL document-service backing ConnectionTierServer
+      (via an in-process gRPC server) to exercise the actual network-shaped
+      round trip, not just a hand-rolled mock of DocumentServiceClient. Main
+      code has no dependency on document-service at all; only tests do.
+    -->
+    <dependency>
+      <groupId>com.collabdoc</groupId>
+      <artifactId>document-service</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.collabdoc.websocket.Main</mainClass>
+                </transformer>
+                <!--
+                  gRPC discovers its transport/provider implementations via
+                  META-INF/services/* files; the default shade behavior
+                  overwrites duplicate entries instead of merging them, which
+                  would silently break grpc-netty-shaded's provider
+                  registration in the fat jar. This merges them correctly.
+                -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

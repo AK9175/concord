@@ -1,10 +1,6 @@
 package com.collabdoc.websocket;
 
-import com.collabdoc.document.DocumentSequencer;
-import com.collabdoc.document.OperationLog;
-import com.collabdoc.document.PostgresDataSources;
-import com.collabdoc.document.PostgresOperationLog;
-import com.zaxxer.hikari.HikariDataSource;
+import com.collabdoc.websocket.grpc.DocumentServiceClient;
 
 public final class Main {
 
@@ -14,21 +10,15 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        // CP 5.2: ack-after-durable falls out of the existing structure for free --
-        // DocumentCommitter.commit() already calls operationLog.append()
-        // synchronously before returning, and ConnectionTierServer only acks/
-        // broadcasts once that whole CompletableFuture completes. Swapping in
-        // PostgresOperationLog (a real durable write) instead of the in-memory one
-        // is the only change CP 5.2 needs; the ordering guarantee was already there.
-        String jdbcUrl = System.getenv().getOrDefault("CONCORD_DB_URL", "jdbc:postgresql://localhost:5432/concord");
-        String username = System.getenv().getOrDefault("CONCORD_DB_USER", "concord");
-        String password = System.getenv().getOrDefault("CONCORD_DB_PASSWORD", "concord");
+        // Phase 6: document-service is now a separate process, reached over
+        // gRPC instead of the in-process DocumentSequencer/PostgresOperationLog
+        // wiring this used to own directly (that wiring now lives entirely in
+        // document-service's own Main).
+        String documentServiceHost = System.getenv().getOrDefault("DOCUMENT_SERVICE_HOST", "localhost");
+        int documentServicePort = Integer.parseInt(System.getenv().getOrDefault("DOCUMENT_SERVICE_PORT", "9090"));
 
-        HikariDataSource dataSource = PostgresDataSources.create(jdbcUrl, username, password);
-        OperationLog operationLog = new PostgresOperationLog(dataSource);
-
-        DocumentSequencer sequencer = new DocumentSequencer(operationLog);
-        ConnectionTierServer server = new ConnectionTierServer(PORT, sequencer);
+        DocumentServiceClient documentService = new DocumentServiceClient(documentServiceHost, documentServicePort);
+        ConnectionTierServer server = new ConnectionTierServer(PORT, documentService);
         server.start();
     }
 }

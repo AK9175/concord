@@ -1,8 +1,8 @@
 package com.collabdoc.websocket;
 
-import com.collabdoc.document.CommittedOperation;
-import com.collabdoc.document.DocumentSequencer;
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.Operation;
+import com.collabdoc.websocket.grpc.DocumentServiceClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java_websocket.WebSocket;
@@ -42,20 +42,23 @@ import java.util.List;
  * path (e.g. ws://host:port/doc-1 -> documentId "doc-1") at connect time --
  * mirroring how Phase 3's browser client opens one document per page.
  *
- * Talks to DocumentSequencer with a direct, in-process Java call (see the
- * tradeoff note in this module's pom.xml): there is no document-service
- * process boundary until Phase 6.
+ * Phase 6: talks to document-service over gRPC (DocumentServiceClient),
+ * a genuinely separate process now, not an in-process Java call. The
+ * register-as-peer + atomic-history-read guarantee that
+ * DocumentSequencer.connect() used to provide is now connection-tier's own
+ * responsibility -- see DocumentTaskSequencer.
  */
 public class ConnectionTierServer extends WebSocketServer {
 
-    private final DocumentSequencer sequencer;
+    private final DocumentServiceClient documentService;
     private final DocumentSessionRegistry sessions = new DocumentSessionRegistry();
     private final PresenceRegistry presence = new PresenceRegistry();
+    private final DocumentTaskSequencer taskSequencer = new DocumentTaskSequencer();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ConnectionTierServer(int port, DocumentSequencer sequencer) {
+    public ConnectionTierServer(int port, DocumentServiceClient documentService) {
         super(new InetSocketAddress(port));
-        this.sequencer = sequencer;
+        this.documentService = documentService;
     }
 
     @Override
@@ -64,10 +67,14 @@ public class ConnectionTierServer extends WebSocketServer {
         System.out.println("connection-tier: connected " + conn.getRemoteSocketAddress() + " to " + documentId);
 
         // Registering as a broadcast peer and reading history happen atomically
-        // on the document's own executor (see DocumentSequencer.connect) so no
-        // concurrent commit can land in the gap between them -- that would
-        // otherwise risk delivering it to this client twice, or not at all.
-        sequencer.connect(documentId, () -> sessions.join(documentId, conn))
+        // on this document's own task-sequencer executor (see
+        // DocumentTaskSequencer) so no concurrent commit can land in the gap
+        // between them -- that would otherwise risk delivering it to this
+        // client twice, or not at all.
+        taskSequencer.runOnDocumentExecutor(documentId, () -> {
+                    sessions.join(documentId, conn);
+                    return documentService.history(documentId);
+                })
                 .thenAccept(history -> send(conn, ServerMessage.history(documentId, history)))
                 .exceptionally(this::logAsyncFailure);
     }
@@ -97,7 +104,7 @@ public class ConnectionTierServer extends WebSocketServer {
                 // rather than trusting its own incremental state indefinitely. This
                 // is a plain read, not tied to peer registration -- the connection is
                 // already registered from onOpen.
-                sequencer.history(documentId)
+                documentService.history(documentId)
                         .thenAccept(history -> send(conn, ServerMessage.history(documentId, history)))
                         .exceptionally(this::logAsyncFailure);
                 return;
@@ -120,7 +127,12 @@ public class ConnectionTierServer extends WebSocketServer {
             }
 
             Operation operation = objectMapper.treeToValue(root, Operation.class);
-            sequencer.submit(documentId, operation)
+            // Submitting and broadcasting are sequenced through the same
+            // per-document executor as connect() (see DocumentTaskSequencer):
+            // .thenAccept here runs synchronously on that executor thread by
+            // ordinary CompletableFuture completion semantics, keeping the
+            // broadcast inside the same atomic unit as the network call.
+            taskSequencer.runOnDocumentExecutor(documentId, () -> documentService.submit(documentId, operation))
                     .thenAccept(committed -> deliver(conn, documentId, committed))
                     .exceptionally(this::logAsyncFailure);
         } catch (Exception ex) {

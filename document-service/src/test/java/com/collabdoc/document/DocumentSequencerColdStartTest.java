@@ -1,5 +1,6 @@
 package com.collabdoc.document;
 
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.InsertOperation;
 import com.collabdoc.ot.OperationApplier;
 import com.zaxxer.hikari.HikariDataSource;

@@ -1,5 +1,6 @@
 package com.collabdoc.document;
 
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.Operation;
 
 import java.util.ArrayList;

@@ -1,6 +1,6 @@
 package com.collabdoc.websocket;
 
-import com.collabdoc.document.CommittedOperation;
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.document.OperationLog;
 import com.collabdoc.ot.Operation;
 

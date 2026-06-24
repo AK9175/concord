@@ -1,6 +1,4 @@
-package com.collabdoc.document;
-
-import com.collabdoc.ot.Operation;
+package com.collabdoc.ot;
 
 /**
  * An operation that has been committed to a document's log at a specific

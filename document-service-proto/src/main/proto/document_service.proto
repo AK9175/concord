@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package com.collabdoc.documentservice.proto;
+
+option java_package = "com.collabdoc.documentservice.proto";
+option java_multiple_files = true;
+
+// The wire contract between connection-tier (client) and document-service
+// (server), once they're separate processes (Phase 6). Mirrors
+// DocumentSequencer's existing Java API field-for-field -- this isn't a new
+// design, just the existing submit()/history() API made network-callable.
+//
+// "registerAsPeer" from DocumentSequencer.connect() is deliberately NOT part
+// of this contract: that's connection-tier's own local WebSocket broadcast
+// bookkeeping, something document-service has no reason to know about over
+// the network. connect()'s actual cross-process need is just GetHistory.
+service DocumentService {
+  rpc SubmitOperation(SubmitOperationRequest) returns (SubmitOperationResponse);
+  rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+}
+
+message Operation {
+  oneof kind {
+    InsertOperation insert = 1;
+    DeleteOperation delete = 2;
+  }
+}
+
+message InsertOperation {
+  int64 base_revision = 1;
+  string user_id = 2;
+  int32 position = 3;
+  string text = 4;
+}
+
+message DeleteOperation {
+  int64 base_revision = 1;
+  string user_id = 2;
+  int32 position = 3;
+  int32 length = 4;
+}
+
+message CommittedOperation {
+  int64 revision = 1;
+  Operation operation = 2;
+}
+
+message SubmitOperationRequest {
+  string document_id = 1;
+  Operation operation = 2;
+}
+
+message SubmitOperationResponse {
+  repeated CommittedOperation committed = 1;
+}
+
+message GetHistoryRequest {
+  string document_id = 1;
+  int64 from_revision = 2;
+}
+
+message GetHistoryResponse {
+  repeated CommittedOperation committed = 1;
+}

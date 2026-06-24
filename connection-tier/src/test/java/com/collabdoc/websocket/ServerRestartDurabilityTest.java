@@ -1,11 +1,11 @@
 package com.collabdoc.websocket;
 
-import com.collabdoc.document.CommittedOperation;
-import com.collabdoc.document.DocumentSequencer;
 import com.collabdoc.document.PostgresDataSources;
 import com.collabdoc.document.PostgresOperationLog;
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.InsertOperation;
 import com.collabdoc.ot.OperationApplier;
+import com.collabdoc.websocket.grpc.InProcessDocumentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariDataSource;
 import org.java_websocket.client.WebSocketClient;
@@ -60,10 +60,10 @@ class ServerRestartDurabilityTest {
         }
     }
 
-    private static ConnectionTierServer startServer() throws InterruptedException {
+    private static ServerHandle startServer() throws InterruptedException {
         CountDownLatch started = new CountDownLatch(1);
-        DocumentSequencer sequencer = new DocumentSequencer(new PostgresOperationLog(dataSource));
-        ConnectionTierServer server = new ConnectionTierServer(0, sequencer) {
+        InProcessDocumentService documentService = new InProcessDocumentService(new PostgresOperationLog(dataSource));
+        ConnectionTierServer server = new ConnectionTierServer(0, documentService.client()) {
             @Override
             public void onStart() {
                 super.onStart();
@@ -72,7 +72,14 @@ class ServerRestartDurabilityTest {
         };
         server.start();
         assertTrue(started.await(5, TimeUnit.SECONDS), "server did not start in time");
-        return server;
+        return new ServerHandle(server, documentService);
+    }
+
+    private record ServerHandle(ConnectionTierServer server, InProcessDocumentService documentService) {
+        void stop() throws InterruptedException {
+            server.stop();
+            documentService.close();
+        }
     }
 
     @Test
@@ -80,8 +87,8 @@ class ServerRestartDurabilityTest {
         String documentId = "doc-" + UUID.randomUUID();
 
         // Server instance #1: make several edits, then stop it entirely.
-        ConnectionTierServer firstServer = startServer();
-        TestClient firstClient = connect(firstServer.getPort(), documentId);
+        ServerHandle firstServer = startServer();
+        TestClient firstClient = connect(firstServer.server().getPort(), documentId);
         firstClient.nextMessage(5, TimeUnit.SECONDS); // initial (empty) history
 
         firstClient.send(MAPPER.writeValueAsString(new InsertOperation(0, "alice", 0, "Hello")));
@@ -93,9 +100,10 @@ class ServerRestartDurabilityTest {
         firstServer.stop();
 
         // Server instance #2: a completely separate process, in spirit -- new
-        // DocumentSequencer, new in-memory cache, same Postgres database.
-        ConnectionTierServer secondServer = startServer();
-        TestClient secondClient = connect(secondServer.getPort(), documentId);
+        // InProcessDocumentService (its own gRPC server + DocumentSequencer +
+        // in-memory cache), same Postgres database.
+        ServerHandle secondServer = startServer();
+        TestClient secondClient = connect(secondServer.server().getPort(), documentId);
 
         ServerMessage history = secondClient.nextMessage(5, TimeUnit.SECONDS);
         assertEquals("history", history.type());

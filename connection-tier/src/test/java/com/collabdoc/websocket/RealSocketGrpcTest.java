@@ -1,15 +1,20 @@
 package com.collabdoc.websocket;
 
+import com.collabdoc.document.DocumentSequencer;
 import com.collabdoc.document.InMemoryOperationLog;
+import com.collabdoc.document.grpc.DocumentServiceGrpcImpl;
 import com.collabdoc.ot.InsertOperation;
-import com.collabdoc.websocket.grpc.InProcessDocumentService;
+import com.collabdoc.websocket.grpc.DocumentServiceClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.ServerSocket;
 import java.net.URI;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -20,19 +25,41 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ConnectionTierServerAckBroadcastTest {
+/**
+ * CP 6.3: every other connection-tier test exercises document-service over
+ * grpc-java's IN-PROCESS transport (InProcessDocumentService) -- fast, but
+ * it never actually serializes a request onto a real socket. This test uses
+ * a REAL TCP port for the gRPC server, exactly like the real two-process
+ * deployment, to close that gap: ack-then-broadcast ordering and multi-
+ * document isolation still hold once an actual network stack (loopback, but
+ * a real one) is involved, not just the in-memory pipe in-process tests use.
+ */
+class RealSocketGrpcTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private InProcessDocumentService documentService;
+    private Server documentServiceServer;
+    private DocumentServiceClient documentServiceClient;
     private ConnectionTierServer server;
     private int port;
 
     @BeforeEach
-    void startServer() throws InterruptedException {
+    void startServers() throws Exception {
+        int documentServicePort;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            documentServicePort = probe.getLocalPort();
+        }
+
+        DocumentSequencer sequencer = new DocumentSequencer(new InMemoryOperationLog());
+        documentServiceServer = ServerBuilder.forPort(documentServicePort)
+                .addService(new DocumentServiceGrpcImpl(sequencer))
+                .build()
+                .start();
+
+        documentServiceClient = new DocumentServiceClient("localhost", documentServicePort);
+
         CountDownLatch started = new CountDownLatch(1);
-        documentService = new InProcessDocumentService(new InMemoryOperationLog());
-        server = new ConnectionTierServer(0, documentService.client()) { // 0 = let the OS pick a free port
+        server = new ConnectionTierServer(0, documentServiceClient) {
             @Override
             public void onStart() {
                 super.onStart();
@@ -40,27 +67,26 @@ class ConnectionTierServerAckBroadcastTest {
             }
         };
         server.start();
-        assertTrue(started.await(5, TimeUnit.SECONDS), "server did not start in time");
+        assertTrue(started.await(5, TimeUnit.SECONDS), "connection-tier did not start in time");
         port = server.getPort();
     }
 
     @AfterEach
-    void stopServer() throws InterruptedException {
+    void stopServers() throws InterruptedException {
         server.stop();
-        documentService.close();
+        documentServiceClient.shutdown();
+        documentServiceServer.shutdownNow();
     }
 
     private TestClient connect(String documentId) throws Exception {
         TestClient client = new TestClient(new URI("ws://localhost:" + port + "/" + documentId));
         assertTrue(client.connectBlocking(5, TimeUnit.SECONDS), "client failed to connect");
-        // Every connect now also delivers a "history" message (CP 2.5) -- drain it
-        // here so the rest of this test file's ack/update assertions are unaffected.
         assertEquals("history", client.nextMessage(5, TimeUnit.SECONDS).type());
         return client;
     }
 
     @Test
-    void editorsEditReachesOtherClientAsUpdateAndReturnsAsAck() throws Exception {
+    void ackThenBroadcastOrderingHoldsOverARealSocket() throws Exception {
         TestClient alice = connect("doc-1");
         TestClient bob = connect("doc-1");
 
@@ -70,39 +96,30 @@ class ConnectionTierServerAckBroadcastTest {
         ServerMessage bobUpdate = bob.nextMessage(5, TimeUnit.SECONDS);
 
         assertEquals("ack", aliceAck.type());
-        assertEquals("doc-1", aliceAck.documentId());
-        assertEquals(1, aliceAck.committed().size());
         assertEquals(1, aliceAck.committed().get(0).revision());
-
         assertEquals("update", bobUpdate.type());
-        assertEquals("doc-1", bobUpdate.documentId());
         assertEquals(aliceAck.committed(), bobUpdate.committed());
-
-        // Alice must not also receive her own op echoed back as an "update".
-        assertNull(alice.pollMessage(500, TimeUnit.MILLISECONDS));
+        assertNull(alice.pollMessage(500, TimeUnit.MILLISECONDS), "sender must not see her own op echoed back");
 
         alice.closeBlocking();
         bob.closeBlocking();
     }
 
     @Test
-    void differentDocumentsDoNotCrossDeliver() throws Exception {
-        TestClient alice = connect("doc-A");
-        TestClient bob = connect("doc-B");
+    void multiDocumentIsolationHoldsOverARealSocket() throws Exception {
+        TestClient aliceOnDocA = connect("doc-A");
+        TestClient bobOnDocB = connect("doc-B");
 
-        alice.send(MAPPER.writeValueAsString(new InsertOperation(0, "alice", 0, "hello")));
+        aliceOnDocA.send(MAPPER.writeValueAsString(new InsertOperation(0, "alice", 0, "hello")));
+        assertEquals("ack", aliceOnDocA.nextMessage(5, TimeUnit.SECONDS).type());
 
-        ServerMessage aliceAck = alice.nextMessage(5, TimeUnit.SECONDS);
-        assertEquals("ack", aliceAck.type());
+        assertNull(bobOnDocB.pollMessage(500, TimeUnit.MILLISECONDS),
+                "a client on a different document must never see another document's edit");
 
-        // Bob is on a different document entirely; he should never hear about this.
-        assertNull(bob.pollMessage(500, TimeUnit.MILLISECONDS));
-
-        alice.closeBlocking();
-        bob.closeBlocking();
+        aliceOnDocA.closeBlocking();
+        bobOnDocB.closeBlocking();
     }
 
-    /** A tiny WebSocketClient that parses every received frame as a ServerMessage and queues it. */
     private static final class TestClient extends WebSocketClient {
 
         private final BlockingQueue<ServerMessage> messages = new ArrayBlockingQueue<>(16);

@@ -1,5 +1,6 @@
 package com.collabdoc.document;
 
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.InsertOperation;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package com.collabdoc.websocket;
 
-import com.collabdoc.document.DocumentSequencer;
 import com.collabdoc.ot.InsertOperation;
+import com.collabdoc.websocket.grpc.InProcessDocumentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -31,14 +31,15 @@ class AckAfterDurableWriteTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private InProcessDocumentService documentService;
     private ConnectionTierServer server;
     private int port;
 
     @BeforeEach
     void startServer() throws InterruptedException {
         CountDownLatch started = new CountDownLatch(1);
-        DocumentSequencer sequencer = new DocumentSequencer(new FailingOperationLog());
-        server = new ConnectionTierServer(0, sequencer) {
+        documentService = new InProcessDocumentService(new FailingOperationLog());
+        server = new ConnectionTierServer(0, documentService.client()) {
             @Override
             public void onStart() {
                 super.onStart();
@@ -53,6 +54,7 @@ class AckAfterDurableWriteTest {
     @AfterEach
     void stopServer() throws InterruptedException {
         server.stop();
+        documentService.close();
     }
 
     private TestClient connect(String documentId) throws Exception {

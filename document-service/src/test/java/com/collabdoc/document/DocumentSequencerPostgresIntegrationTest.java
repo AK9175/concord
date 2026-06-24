@@ -1,5 +1,6 @@
 package com.collabdoc.document;
 
+import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.ot.InsertOperation;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.AfterAll;
