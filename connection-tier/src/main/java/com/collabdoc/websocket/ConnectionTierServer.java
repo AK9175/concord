@@ -61,6 +61,11 @@ public class ConnectionTierServer extends WebSocketServer {
         this.documentService = documentService;
     }
 
+    /** Lets Main wire ConnectionTierAdminServer to the SAME session registry this server uses, not a separate one. */
+    DocumentSessionRegistry sessions() {
+        return sessions;
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         String documentId = documentIdFromPath(handshake.getResourceDescriptor());

@@ -28,4 +28,7 @@ public interface OperationLog {
 
     /** The latest committed revision for documentId, or 0 if nothing has been committed yet. */
     long currentRevision(String documentId);
+
+    /** Permanently removes every committed operation for documentId. A no-op if documentId has none. */
+    void delete(String documentId);
 }

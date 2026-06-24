@@ -2,6 +2,8 @@ package com.collabdoc.document.grpc;
 
 import com.collabdoc.ot.CommittedOperation;
 import com.collabdoc.document.DocumentSequencer;
+import com.collabdoc.documentservice.proto.DeleteDocumentRequest;
+import com.collabdoc.documentservice.proto.DeleteDocumentResponse;
 import com.collabdoc.documentservice.proto.DocumentServiceGrpc;
 import com.collabdoc.documentservice.proto.GetHistoryRequest;
 import com.collabdoc.documentservice.proto.GetHistoryResponse;
@@ -58,6 +60,19 @@ public class DocumentServiceGrpcImpl extends DocumentServiceGrpc.DocumentService
         sequencer.history(request.getDocumentId())
                 .thenAccept(committed -> {
                     responseObserver.onNext(toHistoryResponse(committed));
+                    responseObserver.onCompleted();
+                })
+                .exceptionally(ex -> {
+                    responseObserver.onError(ex);
+                    return null;
+                });
+    }
+
+    @Override
+    public void deleteDocument(DeleteDocumentRequest request, StreamObserver<DeleteDocumentResponse> responseObserver) {
+        sequencer.delete(request.getDocumentId())
+                .thenAccept(ignored -> {
+                    responseObserver.onNext(DeleteDocumentResponse.getDefaultInstance());
                     responseObserver.onCompleted();
                 })
                 .exceptionally(ex -> {

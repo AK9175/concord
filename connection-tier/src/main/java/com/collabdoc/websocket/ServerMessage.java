@@ -30,4 +30,13 @@ public record ServerMessage(String type, String documentId, List<CommittedOperat
     public static ServerMessage history(String documentId, List<CommittedOperation> committed) {
         return new ServerMessage("history", documentId, committed);
     }
+
+    /**
+     * Sent to every connection on a document right before it gets forcibly
+     * closed, because the document was deleted (see ConnectionTierAdminServer).
+     * No committed ops -- there's nothing left to replay.
+     */
+    public static ServerMessage deleted(String documentId) {
+        return new ServerMessage("deleted", documentId, List.of());
+    }
 }

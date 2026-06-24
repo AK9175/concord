@@ -115,4 +115,27 @@ abstract class OperationLogContractTest {
             assertEquals(i + 1, history.get(i).revision());
         }
     }
+
+    @Test
+    void deleteRemovesEveryCommittedOperationForThatDocumentOnly() {
+        OperationLog log = createLog();
+        String docToDelete = freshDocumentId();
+        String otherDoc = freshDocumentId();
+
+        log.append(docToDelete, new InsertOperation(0, "alice", 0, "a"));
+        log.append(docToDelete, new InsertOperation(0, "alice", 1, "b"));
+        log.append(otherDoc, new InsertOperation(0, "bob", 0, "c"));
+
+        log.delete(docToDelete);
+
+        assertTrue(log.readFrom(docToDelete, 0).isEmpty());
+        assertEquals(0, log.currentRevision(docToDelete));
+        assertEquals(1, log.currentRevision(otherDoc), "deleting one document must not touch another's log");
+    }
+
+    @Test
+    void deletingAnUnknownDocumentIsANoOp() {
+        OperationLog log = createLog();
+        log.delete(freshDocumentId());
+    }
 }

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package com.collabdoc.connectiontier.proto;
+
+option java_package = "com.collabdoc.connectiontier.proto";
+option java_multiple_files = true;
+
+// A small admin-only contract, separate from the browser-facing WebSocket
+// protocol: document-metadata-service calls this to evict any connections
+// currently editing a document that's just been deleted. Nothing about the
+// regular OT/presence/cursor flow goes through this -- it exists purely so
+// document-metadata-service (which owns the catalog of documents) can reach
+// connection-tier (which owns the live WebSocket sessions), the same way
+// document-service-proto exists so it can reach document-service.
+service ConnectionTierAdmin {
+  rpc EvictDocument(EvictDocumentRequest) returns (EvictDocumentResponse);
+}
+
+message EvictDocumentRequest {
+  string document_id = 1;
+}
+
+message EvictDocumentResponse {
+  // Number of connections actually closed -- purely informational for the
+  // caller/logs, not relied on for correctness.
+  int32 connections_closed = 1;
+}

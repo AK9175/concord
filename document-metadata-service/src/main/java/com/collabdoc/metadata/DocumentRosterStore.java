@@ -23,4 +23,7 @@ public interface DocumentRosterStore {
      * Returns empty if userId isn't in documentId's roster.
      */
     Optional<User> renameUser(String documentId, String userId, String username, String color);
+
+    /** Removes every roster entry for documentId. A no-op if it has none. */
+    void deleteRoster(String documentId);
 }

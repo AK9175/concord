@@ -61,4 +61,19 @@ abstract class DocumentMetadataStoreContractTest {
         DocumentMetadataStore store = createStore();
         assertEquals(Optional.empty(), store.rename("does-not-exist", "x"));
     }
+
+    @Test
+    void deleteRemovesTheDocumentAndReturnsTrue() {
+        DocumentMetadataStore store = createStore();
+        Document created = store.create("Throwaway");
+
+        assertTrue(store.delete(created.id()));
+        assertEquals(Optional.empty(), store.get(created.id()));
+    }
+
+    @Test
+    void deletingAnUnknownDocumentReturnsFalse() {
+        DocumentMetadataStore store = createStore();
+        assertEquals(false, store.delete("does-not-exist"));
+    }
 }

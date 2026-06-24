@@ -19,4 +19,7 @@ public interface DocumentMetadataStore {
 
     /** Returns the renamed document, or empty if documentId doesn't exist. */
     Optional<Document> rename(String documentId, String newTitle);
+
+    /** Removes documentId's catalog entry. Returns true if it existed, false if there was nothing to delete. */
+    boolean delete(String documentId);
 }

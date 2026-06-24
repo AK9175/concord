@@ -3,6 +3,7 @@ package com.collabdoc.document.grpc;
 import com.collabdoc.document.DocumentSequencer;
 import com.collabdoc.document.InMemoryOperationLog;
 import com.collabdoc.documentservice.proto.CommittedOperation;
+import com.collabdoc.documentservice.proto.DeleteDocumentRequest;
 import com.collabdoc.documentservice.proto.DocumentServiceGrpc;
 import com.collabdoc.documentservice.proto.GetHistoryRequest;
 import com.collabdoc.documentservice.proto.GetHistoryResponse;
@@ -133,6 +134,44 @@ class DocumentServiceGrpcImplTest {
                 .build();
 
         assertThrows(io.grpc.StatusRuntimeException.class, () -> client.submitOperation(malformed));
+    }
+
+    @Test
+    void deleteDocumentWipesItsHistoryAndDoesNotAffectOtherDocuments() {
+        String documentId = freshDocumentId();
+        String otherDocumentId = freshDocumentId();
+
+        client.submitOperation(submitInsert(documentId, "alice", 0, 0, "Hello"));
+        client.submitOperation(submitInsert(otherDocumentId, "bob", 0, 0, "Untouched"));
+
+        client.deleteDocument(DeleteDocumentRequest.newBuilder().setDocumentId(documentId).build());
+
+        GetHistoryResponse afterDelete = client.getHistory(GetHistoryRequest.newBuilder()
+                .setDocumentId(documentId)
+                .setFromRevision(0)
+                .build());
+        assertEquals(0, afterDelete.getCommittedCount());
+
+        GetHistoryResponse other = client.getHistory(GetHistoryRequest.newBuilder()
+                .setDocumentId(otherDocumentId)
+                .setFromRevision(0)
+                .build());
+        assertEquals(1, other.getCommittedCount(), "deleting one document must not affect another's history");
+    }
+
+    @Test
+    void editingADeletedDocumentAfterwardStartsFreshNotCorrupted() {
+        String documentId = freshDocumentId();
+
+        client.submitOperation(submitInsert(documentId, "alice", 0, 0, "Hello"));
+        client.deleteDocument(DeleteDocumentRequest.newBuilder().setDocumentId(documentId).build());
+
+        // The in-memory cache entry must also be cleared, not just the log --
+        // otherwise this would apply against the stale cached "Hello" instead
+        // of starting from "".
+        SubmitOperationResponse response = client.submitOperation(submitInsert(documentId, "bob", 0, 0, "Fresh"));
+        assertEquals(1, response.getCommitted(0).getRevision(),
+                "a deleted document's revision counter must restart from 1, proving the log was really wiped");
     }
 
     private static SubmitOperationRequest submitInsert(

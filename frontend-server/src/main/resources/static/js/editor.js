@@ -223,6 +223,14 @@ const socket = connectToDocument(documentId, (message) => {
       knownRevision = Math.max(knownRevision, committed.revision);
     }
     redrawCursors();
+  } else if (message.type === "deleted") {
+    // The server (connection-tier's admin eviction, triggered by someone
+    // deleting this document from the landing page) sends this then closes
+    // the socket right after -- nothing left to sync, so just stop editing
+    // and send the user back rather than leaving a dead, frozen textarea.
+    textareaEl.disabled = true;
+    window.alert("This document was deleted.");
+    window.location.href = "/";
   }
 });
 

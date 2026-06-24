@@ -23,4 +23,9 @@ class FailingOperationLog implements OperationLog {
     public long currentRevision(String documentId) {
         return 0;
     }
+
+    @Override
+    public void delete(String documentId) {
+        throw new RuntimeException("simulated durable-write failure");
+    }
 }

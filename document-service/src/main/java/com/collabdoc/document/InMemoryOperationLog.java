@@ -55,4 +55,9 @@ public class InMemoryOperationLog implements OperationLog {
         CopyOnWriteArrayList<CommittedOperation> log = logsByDocument.get(documentId);
         return log == null ? 0L : log.size();
     }
+
+    @Override
+    public void delete(String documentId) {
+        logsByDocument.remove(documentId);
+    }
 }

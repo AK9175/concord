@@ -39,4 +39,9 @@ public class InMemoryDocumentMetadataStore implements DocumentMetadataStore {
         documents.put(documentId, renamed);
         return Optional.of(renamed);
     }
+
+    @Override
+    public boolean delete(String documentId) {
+        return documents.remove(documentId) != null;
+    }
 }

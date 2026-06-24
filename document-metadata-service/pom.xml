@@ -41,6 +41,34 @@
       <artifactId>HikariCP</artifactId>
     </dependency>
 
+    <!--
+      Delete orchestration (the only cross-service calls this module makes):
+      a gRPC client to document-service (wipe the op log) and one to
+      connection-tier's small admin service (evict active sessions).
+      Depends only on the proto contracts, never on either service's actual
+      code, the same pattern as connection-tier's DocumentServiceClient.
+    -->
+    <dependency>
+      <groupId>com.collabdoc</groupId>
+      <artifactId>document-service-proto</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.collabdoc</groupId>
+      <artifactId>connection-tier-proto</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-netty-shaded</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-inprocess</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -64,6 +92,8 @@
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>com.collabdoc.metadata.Main</mainClass>
                 </transformer>
+                <!-- See connection-tier/pom.xml for why this is required alongside grpc-netty-shaded. -->
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
             </configuration>
           </execution>

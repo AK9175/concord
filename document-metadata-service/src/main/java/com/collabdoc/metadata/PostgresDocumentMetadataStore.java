@@ -92,6 +92,17 @@ public class PostgresDocumentMetadataStore implements DocumentMetadataStore {
         }
     }
 
+    @Override
+    public boolean delete(String documentId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement delete = conn.prepareStatement("DELETE FROM documents WHERE id = ?")) {
+            delete.setString(1, documentId);
+            return delete.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            throw new IllegalStateException("failed to delete document " + documentId, ex);
+        }
+    }
+
     private static Document toDocument(ResultSet rs) throws SQLException {
         return new Document(rs.getString("id"), rs.getString("title"));
     }

@@ -48,11 +48,21 @@ services:
       CONCORD_DB_URL: jdbc:postgresql://postgres:5432/concord
       CONCORD_DB_USER: concord
       CONCORD_DB_PASSWORD: concord
+      # Delete orchestration: gRPC calls to document-service (wipe content)
+      # and connection-tier's admin port (evict active sessions).
+      DOCUMENT_SERVICE_HOST: document-service
+      DOCUMENT_SERVICE_PORT: "9090"
+      CONNECTION_TIER_ADMIN_HOST: connection-tier
+      CONNECTION_TIER_ADMIN_PORT: "8091"
     ports:
       - "8083:8083"
     depends_on:
       postgres:
         condition: service_healthy
+      document-service:
+        condition: service_started
+      connection-tier:
+        condition: service_started
 
   connection-tier:
     build:
@@ -68,6 +78,7 @@ services:
       DOCUMENT_SERVICE_PORT: "9090"
     ports:
       - "8081:8081"
+      - "8091:8091"
     depends_on:
       - document-service
 

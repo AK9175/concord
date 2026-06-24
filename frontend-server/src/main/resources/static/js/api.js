@@ -53,3 +53,14 @@ export function renameUser(documentId, userId, username, color) {
     body: JSON.stringify({ username, color }),
   }).then(asJson);
 }
+
+// Deliberately not routed through asJson: a successful delete returns 204
+// with no body, and asJson's response.json() would throw trying to parse
+// that as JSON.
+export async function deleteDocument(documentId) {
+  const response = await fetch(`${API_BASE}/docs/${documentId}`, { method: "DELETE" });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `request failed: ${response.status}`);
+  }
+}

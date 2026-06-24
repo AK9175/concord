@@ -1,5 +1,7 @@
 package com.collabdoc.metadata;
 
+import com.collabdoc.metadata.grpc.ConnectionTierEvictClient;
+import com.collabdoc.metadata.grpc.DocumentServiceDeleteClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -29,13 +31,18 @@ public class DocumentMetadataServer {
 
     private final DocumentMetadataStore metadataStore;
     private final DocumentRosterStore rosterStore;
+    private final DocumentServiceDeleteClient documentServiceClient;
+    private final ConnectionTierEvictClient connectionTierClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpServer server;
 
-    public DocumentMetadataServer(int port, DocumentMetadataStore metadataStore, DocumentRosterStore rosterStore)
+    public DocumentMetadataServer(int port, DocumentMetadataStore metadataStore, DocumentRosterStore rosterStore,
+            DocumentServiceDeleteClient documentServiceClient, ConnectionTierEvictClient connectionTierClient)
             throws IOException {
         this.metadataStore = metadataStore;
         this.rosterStore = rosterStore;
+        this.documentServiceClient = documentServiceClient;
+        this.connectionTierClient = connectionTierClient;
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.server.createContext("/docs", this::handle);
     }
@@ -110,9 +117,47 @@ public class DocumentMetadataServer {
             } else {
                 sendJson(exchange, 404, errorBody("document not found"));
             }
+        } else if (method.equals("DELETE")) {
+            handleDelete(exchange, documentId);
         } else {
             sendJson(exchange, 405, errorBody("method not allowed"));
         }
+    }
+
+    /**
+     * Order matters here, since this isn't transactional across three
+     * independent services: eviction is best-effort first (so active editors
+     * are told before their data disappears, but a briefly-unreachable
+     * connection-tier shouldn't block the delete); wiping document-service's
+     * op log is REQUIRED to succeed before touching this service's own
+     * tables, so a failure here leaves the document fully intact and visible
+     * rather than an orphaned, data-less catalog entry; the catalog row
+     * itself is removed LAST, once we're confident the underlying content is
+     * actually gone.
+     */
+    private void handleDelete(HttpExchange exchange, String documentId) throws IOException {
+        if (metadataStore.get(documentId).isEmpty()) {
+            sendJson(exchange, 404, errorBody("document not found"));
+            return;
+        }
+
+        try {
+            connectionTierClient.evictDocument(documentId);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        try {
+            documentServiceClient.deleteDocument(documentId);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            sendJson(exchange, 502, errorBody("failed to delete document content; document was not deleted"));
+            return;
+        }
+
+        rosterStore.deleteRoster(documentId);
+        metadataStore.delete(documentId);
+        exchange.sendResponseHeaders(204, -1);
     }
 
     private void handleRoster(HttpExchange exchange, String method, String documentId) throws IOException {
@@ -158,7 +203,7 @@ public class DocumentMetadataServer {
 
     private static void addCorsHeaders(HttpExchange exchange) {
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
         exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
     }
 

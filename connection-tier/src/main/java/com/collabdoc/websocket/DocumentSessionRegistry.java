@@ -41,6 +41,11 @@ class DocumentSessionRegistry {
         return peers.stream().filter(connection -> connection != excluding).collect(Collectors.toSet());
     }
 
+    /** Every connection currently on documentId, including all of them -- used for eviction, not broadcast. */
+    Set<WebSocket> allInDocument(String documentId) {
+        return Set.copyOf(connectionsByDocument.getOrDefault(documentId, Set.of()));
+    }
+
     String documentIdFor(WebSocket connection) {
         return documentByConnection.get(connection);
     }

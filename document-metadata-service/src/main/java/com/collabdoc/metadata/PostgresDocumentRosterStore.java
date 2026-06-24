@@ -87,6 +87,17 @@ public class PostgresDocumentRosterStore implements DocumentRosterStore {
         }
     }
 
+    @Override
+    public void deleteRoster(String documentId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement delete = conn.prepareStatement("DELETE FROM document_roster WHERE document_id = ?")) {
+            delete.setString(1, documentId);
+            delete.executeUpdate();
+        } catch (SQLException ex) {
+            throw new IllegalStateException("failed to delete roster for " + documentId, ex);
+        }
+    }
+
     private static User toUser(ResultSet rs) throws SQLException {
         return new User(rs.getString("user_id"), rs.getString("username"), rs.getString("color"));
     }

@@ -73,6 +73,26 @@ public class DocumentSequencer {
         return runOnDocumentExecutor(documentId, () -> committer.history(documentId));
     }
 
+    /**
+     * Routed through documentId's own executor for the same reason commit()
+     * is: without it, a concurrent submit() could land between the delete's
+     * log wipe and cache eviction (DocumentCommitter.delete()'s ordering),
+     * reading or writing a half-deleted state. Deliberately does NOT remove
+     * documentId's entry from executorsByDocument afterward -- this project
+     * never garbage-collects per-document executors for any reason (an
+     * existing, accepted cost, not a new one introduced here), and removing
+     * one specifically on delete would race a concurrent submit() for the
+     * same documentId in a way that's worse than just leaving a parked
+     * thread behind: it could throw RejectedExecutionException despite the
+     * caller having no way to know the executor was about to be retired.
+     */
+    public CompletableFuture<Void> delete(String documentId) {
+        return runOnDocumentExecutor(documentId, () -> {
+            committer.delete(documentId);
+            return null;
+        });
+    }
+
     private <T> CompletableFuture<T> runOnDocumentExecutor(String documentId, Supplier<T> task) {
         ExecutorService executor = executorsByDocument.computeIfAbsent(
                 documentId, id -> Executors.newSingleThreadExecutor());

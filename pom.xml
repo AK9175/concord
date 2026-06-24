@@ -18,6 +18,7 @@
   <modules>
     <module>ot-core</module>
     <module>document-service-proto</module>
+    <module>connection-tier-proto</module>
     <module>document-metadata-service</module>
     <module>connection-tier</module>
     <module>document-service</module>
@@ -77,6 +78,11 @@
       <dependency>
         <groupId>com.collabdoc</groupId>
         <artifactId>document-service-proto</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.collabdoc</groupId>
+        <artifactId>connection-tier-proto</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

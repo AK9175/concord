@@ -73,4 +73,24 @@ abstract class DocumentRosterStoreContractTest {
 
         assertEquals(Optional.empty(), store.renameUser(documentId, "does-not-exist", "x", "#000000"));
     }
+
+    @Test
+    void deleteRosterRemovesEveryEntryForThatDocumentOnly() {
+        DocumentRosterStore store = createStore();
+        String docToDelete = freshDocumentId();
+        String otherDoc = freshDocumentId();
+        store.addUser(docToDelete, "alice", "#ff0000");
+        store.addUser(otherDoc, "bob", "#00ff00");
+
+        store.deleteRoster(docToDelete);
+
+        assertEquals(List.of(), store.listUsers(docToDelete));
+        assertEquals(1, store.listUsers(otherDoc).size(), "deleting one document's roster must not affect another's");
+    }
+
+    @Test
+    void deletingAnUnknownDocumentsRosterIsANoOp() {
+        DocumentRosterStore store = createStore();
+        store.deleteRoster(freshDocumentId());
+    }
 }

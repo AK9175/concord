@@ -99,4 +99,18 @@ class DocumentCommitter {
     List<CommittedOperation> history(String documentId) {
         return operationLog.readFrom(documentId, 0);
     }
+
+    /**
+     * Wipes documentId's durable op log AND its in-memory text cache entry.
+     * Order matters: removing the cache entry FIRST and the log SECOND would
+     * leave a window where a concurrent currentText() call could rebuild the
+     * cache from the (not-yet-deleted) log right after the cache eviction --
+     * resurrecting the "deleted" document's content. Deleting the log first
+     * means any such rebuild attempt just finds nothing, same as a document
+     * that never existed.
+     */
+    void delete(String documentId) {
+        operationLog.delete(documentId);
+        textByDocument.remove(documentId);
+    }
 }

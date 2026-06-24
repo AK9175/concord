@@ -1,4 +1,4 @@
-import { listDocuments, createDocument, renameDocument } from "./api.js";
+import { listDocuments, createDocument, renameDocument, deleteDocument } from "./api.js";
 
 const docListEl = document.getElementById("doc-list");
 const emptyStateEl = document.getElementById("empty-state");
@@ -66,8 +66,29 @@ function renderDocuments(documents) {
       openModal({ mode: "rename", documentId: doc.id, currentTitle: doc.title })
     );
 
-    row.append(link, renameButton);
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.className = "ml-3 text-sm text-slate-400 hover:text-red-600";
+    deleteButton.addEventListener("click", () => handleDelete(doc));
+
+    const actions = document.createElement("div");
+    actions.append(renameButton, deleteButton);
+
+    row.append(link, actions);
     docListEl.append(row);
+  }
+}
+
+async function handleDelete(doc) {
+  const title = doc.title || "Untitled document";
+  if (!window.confirm(`Delete "${title}"? This permanently removes its content and roster, and disconnects anyone currently editing it.`)) {
+    return;
+  }
+  try {
+    await deleteDocument(doc.id);
+    await refresh();
+  } catch (err) {
+    showError("Couldn't delete: " + err.message);
   }
 }
 

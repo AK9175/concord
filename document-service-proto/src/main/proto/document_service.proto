@@ -17,6 +17,11 @@ option java_multiple_files = true;
 service DocumentService {
   rpc SubmitOperation(SubmitOperationRequest) returns (SubmitOperationResponse);
   rpc GetHistory(GetHistoryRequest) returns (GetHistoryResponse);
+  // Wipes a document's entire op log AND clears its in-memory text cache
+  // entry -- document-metadata-service calls this as part of orchestrating a
+  // document delete; document-service has no notion of "delete" triggered
+  // from anywhere else.
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 }
 
 message Operation {
@@ -61,4 +66,11 @@ message GetHistoryRequest {
 
 message GetHistoryResponse {
   repeated CommittedOperation committed = 1;
+}
+
+message DeleteDocumentRequest {
+  string document_id = 1;
+}
+
+message DeleteDocumentResponse {
 }

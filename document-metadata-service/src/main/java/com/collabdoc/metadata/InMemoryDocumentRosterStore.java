@@ -36,6 +36,11 @@ public class InMemoryDocumentRosterStore implements DocumentRosterStore {
         return Optional.of(renamed);
     }
 
+    @Override
+    public void deleteRoster(String documentId) {
+        rostersByDocument.remove(documentId);
+    }
+
     private Map<String, User> rosterFor(String documentId) {
         return rostersByDocument.computeIfAbsent(documentId, id -> new ConcurrentHashMap<>());
     }

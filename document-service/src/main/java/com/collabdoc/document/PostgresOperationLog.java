@@ -131,6 +131,17 @@ public class PostgresOperationLog implements OperationLog {
         }
     }
 
+    @Override
+    public void delete(String documentId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("DELETE FROM operations WHERE document_id = ?")) {
+            stmt.setString(1, documentId);
+            stmt.executeUpdate();
+        } catch (SQLException ex) {
+            throw new IllegalStateException("failed to delete operations for " + documentId, ex);
+        }
+    }
+
     private CommittedOperation toCommittedOperation(ResultSet rs) throws SQLException {
         long revision = rs.getLong("revision");
         String userId = rs.getString("user_id");

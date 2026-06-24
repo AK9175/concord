@@ -1,5 +1,6 @@
 package com.collabdoc.metadata;
 
+import com.collabdoc.metadata.grpc.InProcessDeleteBackends;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,12 +22,15 @@ class DocumentMetadataServerTest {
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private InProcessDeleteBackends backends;
     private DocumentMetadataServer server;
     private int port;
 
     @BeforeEach
     void startServer() throws Exception {
-        server = new DocumentMetadataServer(0, new InMemoryDocumentMetadataStore(), new InMemoryDocumentRosterStore());
+        backends = new InProcessDeleteBackends();
+        server = new DocumentMetadataServer(0, new InMemoryDocumentMetadataStore(), new InMemoryDocumentRosterStore(),
+                backends.documentServiceClient(), backends.connectionTierClient());
         server.start();
         port = server.getPort();
     }
@@ -33,6 +38,7 @@ class DocumentMetadataServerTest {
     @AfterEach
     void stopServer() {
         server.stop();
+        backends.close();
     }
 
     private HttpResponse<String> request(String method, String path, String jsonBody) throws Exception {
@@ -157,5 +163,45 @@ class DocumentMetadataServerTest {
     void responsesIncludeCorsHeadersForTheFrontendsOrigin() throws Exception {
         HttpResponse<String> response = request("GET", "/docs", null);
         assertEquals("*", response.headers().firstValue("Access-Control-Allow-Origin").orElse(null));
+    }
+
+    @Test
+    void deletingADocumentEvictsSessionsWipesContentAndRemovesMetadataAndRoster() throws Exception {
+        String documentId = MAPPER.readTree(request("POST", "/docs", "{\"title\":\"To Delete\"}").body())
+                .get("id").asText();
+        request("POST", "/docs/" + documentId + "/users", "{\"username\":\"alice\",\"color\":\"#ff0000\"}");
+
+        HttpResponse<String> deleteResponse = request("DELETE", "/docs/" + documentId, null);
+        assertEquals(204, deleteResponse.statusCode());
+
+        assertEquals(404, request("GET", "/docs/" + documentId, null).statusCode());
+        JsonNode usersAfterDelete = MAPPER.readTree(request("GET", "/docs/" + documentId + "/users", null).body());
+        assertEquals(0, usersAfterDelete.size());
+
+        assertEquals(List.of(documentId), backends.evictedDocumentIds(),
+                "the connection-tier admin RPC must be called for this document before it's deleted");
+        assertEquals(List.of(documentId), backends.deletedDocumentIds(),
+                "document-service's DeleteDocument RPC must be called to wipe the actual content");
+    }
+
+    @Test
+    void deletingAnUnknownDocumentReturns404() throws Exception {
+        HttpResponse<String> response = request("DELETE", "/docs/does-not-exist", null);
+        assertEquals(404, response.statusCode());
+        assertEquals(List.of(), backends.deletedDocumentIds(), "nothing should be called for a document that was never there");
+    }
+
+    @Test
+    void aFailureWipingDocumentServiceContentLeavesTheDocumentFullyIntact() throws Exception {
+        String documentId = MAPPER.readTree(request("POST", "/docs", "{\"title\":\"Keep Me\"}").body())
+                .get("id").asText();
+        backends.failNextDelete();
+
+        HttpResponse<String> deleteResponse = request("DELETE", "/docs/" + documentId, null);
+        assertEquals(502, deleteResponse.statusCode());
+
+        HttpResponse<String> getResponse = request("GET", "/docs/" + documentId, null);
+        assertEquals(200, getResponse.statusCode(), "the document must still exist after a failed delete, not be half-removed");
+        assertEquals("Keep Me", MAPPER.readTree(getResponse.body()).get("title").asText());
     }
 }
