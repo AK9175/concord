@@ -31,7 +31,8 @@ public class FrontendServer {
             "json", "application/json; charset=utf-8",
             "svg", "image/svg+xml",
             "png", "image/png",
-            "ico", "image/x-icon");
+            "ico", "image/x-icon",
+            "md", "text/markdown; charset=utf-8");
 
     private final HttpServer server;
     private final Path root;

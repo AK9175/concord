@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concord &mdash; Documentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/base.css" />
+  <style>
+    /* Plain, readable typography for rendered markdown -- Tailwind's
+       utility classes don't reach into marked's generated HTML, so this is
+       a small hand-written equivalent of the @tailwindcss/typography plugin
+       (not pulled in as a dependency for one page). */
+    #docs-content h1 { font-size: 1.875rem; font-weight: 700; margin: 2rem 0 1rem; }
+    #docs-content h2 { font-size: 1.5rem; font-weight: 700; margin: 2rem 0 1rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
+    #docs-content h3 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+    #docs-content p { margin: 0.75rem 0; line-height: 1.7; color: #334155; }
+    #docs-content ul, #docs-content ol { margin: 0.75rem 0 0.75rem 1.5rem; line-height: 1.7; color: #334155; }
+    #docs-content li { margin: 0.25rem 0; }
+    #docs-content code { background: #f1f5f9; padding: 0.15em 0.4em; border-radius: 0.25rem; font-size: 0.875em; }
+    #docs-content pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1rem 0; }
+    #docs-content pre code { background: none; padding: 0; color: inherit; }
+    #docs-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+    #docs-content th, #docs-content td { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; text-align: left; }
+    #docs-content th { background: #f8fafc; font-weight: 600; }
+    #docs-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 2rem 0; }
+    #docs-content .mermaid-block { margin: 1.5rem 0; overflow-x: auto; display: flex; justify-content: center; }
+    #docs-content blockquote { border-left: 3px solid #818cf8; padding-left: 1rem; color: #475569; margin: 1rem 0; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
+      <a href="/" class="flex items-center gap-2.5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white font-semibold">C</div>
+        <span class="text-lg font-semibold tracking-tight">Concord</span>
+      </a>
+      <a href="/" class="text-sm font-medium text-slate-500 hover:text-indigo-600">&larr; Back to documents</a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-4xl px-6 py-10">
+    <div id="docs-loading" class="text-sm text-slate-400">Loading documentation&hellip;</div>
+    <div id="docs-content" class="hidden"></div>
+  </main>
+
+  <script type="module" src="/js/docs.js"></script>
+</body>
+</html>
